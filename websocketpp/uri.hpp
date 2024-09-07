@@ -301,6 +301,13 @@ inline bool ipv6_literal(std::string::const_iterator start, std::string::const_i
     if (end-start > 45 && end-start >= 2) {
         return false;
     }
+    if (*start == '[')
+    {
+        ++start;
+        --end;
+        if (*end != ']') return false;
+    }
+        
     
     // peal off and count hex4s until we run out of colons,
     // note the abbreviation marker if we see one.
