@@ -575,7 +575,7 @@ public:
     uri(bool secure, std::string const & host, uint16_t port,
         std::string const & resource)
       : m_scheme(secure ? "wss" : "ws")
-      , m_host(host)
+      , m_host(normalize_ip6_address(host))
       , m_resource(resource.empty() ? "/" : resource)
       , m_port(port)
       , m_secure(secure)
@@ -586,7 +586,7 @@ public:
 
     uri(bool secure, std::string const & host, std::string const & resource)
       : m_scheme(secure ? "wss" : "ws")
-      , m_host(host)
+      , m_host(normalize_ip6_address(host))
       , m_resource(resource.empty() ? "/" : resource)
       , m_port(secure ? uri_default_secure_port : uri_default_port)
       , m_secure(secure)
@@ -598,7 +598,7 @@ public:
     uri(bool secure, std::string const & host, std::string const & port,
         std::string const & resource)
       : m_scheme(secure ? "wss" : "ws")
-      , m_host(host)
+      , m_host(normalize_ip6_address(host))
       , m_resource(resource.empty() ? "/" : resource)
       , m_secure(secure)
     {
@@ -612,7 +612,7 @@ public:
     uri(std::string const & scheme, std::string const & host, uint16_t port,
         std::string const & resource)
       : m_scheme(scheme)
-      , m_host(host)
+      , m_host(normalize_ip6_address(host))
       , m_resource(resource.empty() ? "/" : resource)
       , m_port(port)
       , m_secure(scheme == "wss" || scheme == "https")
@@ -623,7 +623,7 @@ public:
 
     uri(std::string scheme, std::string const & host, std::string const & resource)
       : m_scheme(scheme)
-      , m_host(host)
+      , m_host(normalize_ip6_address(host))
       , m_resource(resource.empty() ? "/" : resource)
       , m_port((scheme == "wss" || scheme == "https") ? uri_default_secure_port : uri_default_port)
       , m_secure(scheme == "wss" || scheme == "https")
@@ -635,7 +635,7 @@ public:
     uri(std::string const & scheme, std::string const & host,
         std::string const & port, std::string const & resource)
       : m_scheme(scheme)
-      , m_host(host)
+      , m_host(normalize_ip6_address(host))
       , m_resource(resource.empty() ? "/" : resource)
       , m_secure(scheme == "wss" || scheme == "https")
     {
@@ -646,6 +646,15 @@ public:
         m_valid = !ec && (m_ipv6_literal || uri_helper::reg_name(host.begin(), host.end()));
     }
 
+    static std::string normalize_ip6_address(const std::string&address)
+    {
+        // always use the no-[] form of ip-address interally..
+        if (address.length() >= 2 && address[0] == '[' && address[address.length()-1] == ']')
+        {
+            return address.substr(1,address.length()-2);
+        }
+        return address;
+    }
     bool get_valid() const {
         return m_valid;
     }

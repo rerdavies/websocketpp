@@ -135,7 +135,7 @@ int get_websocket_version(request_type& r) {
 template <typename request_type>
 uri_ptr get_uri_from_host(request_type & request, std::string scheme) {
     std::string h = request.get_header("Host");
-
+ 
     size_t last_colon = h.rfind(":");
     size_t last_sbrace = h.rfind("]");
 
@@ -149,7 +149,7 @@ uri_ptr get_uri_from_host(request_type & request, std::string scheme) {
         return lib::make_shared<uri>(scheme, h, request.get_uri());
     } else {
         return lib::make_shared<uri>(scheme,
-                               h.substr(0,last_colon),
+                               h.substr(0,last_colon), // strip '[]'
                                h.substr(last_colon+1),
                                request.get_uri());
     }
