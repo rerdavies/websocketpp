@@ -37,6 +37,50 @@ namespace websocketpp {
 namespace http {
 namespace parser {
 
+
+class download_file {
+public:
+    download_file(const std::filesystem::path &filePath, bool deleteWhenDone)
+    : filePath(filePath), deleteWhenDone(deleteWhenDone) 
+    {
+    }
+
+    uintmax_t size() const {
+        return std::filesystem::file_size(filePath);
+    }
+    lib::error_code open() {
+        f = fopen(filePath.c_str(),"r");
+        if (!f) {
+            return  error::make_error_code(error::istream_bad);
+        }
+        return lib::error_code();
+    }
+
+    void close() {
+        if (f) {
+            fclose(f);
+            f = nullptr;
+        }
+    }
+    size_t read(void*buffer, size_t n) {
+        return fread(buffer,1,n,f);
+    }
+
+    ~download_file() {
+        close();
+        if (deleteWhenDone && !filePath.empty())
+        {
+            std::filesystem::remove(filePath);
+        }
+    }
+
+private:
+    std::filesystem::path filePath;
+    bool deleteWhenDone;
+    FILE* f= nullptr;
+};
+
+
 /// Stores, parses, and manipulates HTTP responses
 /**
  * http::response provides the following functionality for working with HTTP
@@ -153,6 +197,13 @@ public:
     /// Returns the full raw response
     std::string raw() const;
 
+    // a file to use in place of the body.
+    void set_body_file(const std::filesystem::path&filePath, bool deleteWhenDone);
+
+    std::shared_ptr<download_file> get_body_file();
+    std::shared_ptr<download_file> take_body_file();
+
+
     /// Set response status code and message
     /**
      * Sets the response status code to `code` and looks up the corresponding
@@ -191,6 +242,9 @@ public:
         return m_status_msg;
     }
 private:
+
+    std::shared_ptr<download_file> body_file;
+
     /// Helper function for consume. Process response line
     lib::error_code process(std::string::iterator begin, std::string::iterator end);
 

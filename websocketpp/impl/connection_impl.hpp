@@ -650,6 +650,29 @@ void connection<config>::set_body(std::string && value) {
 #endif // _WEBSOCKETPP_MOVE_SEMANTICS_
 
 template <typename config>
+void connection<config>::set_body_file(const std::filesystem::path&path, bool deleteWhenDone, lib::error_code&ec)
+{
+    if (m_internal_state != istate::PROCESS_HTTP_REQUEST) {
+        ec = error::make_error_code(error::invalid_state);
+        return;
+    }
+    this->m_response.set_body_file(path,deleteWhenDone);
+}
+#ifndef _WEBSOCKETPP_NO_EXCEPTIONS_
+template <typename config>
+void connection<config>::set_body_file(const std::filesystem::path&path, bool deleteWhenDone)
+{
+    lib::error_code ec;
+    set_body_file(path,deleteWhenDone,ec);
+
+    if (ec) {
+        throw exception("Call to set_body_file from invalid state",ec);
+    }
+}
+#endif
+
+
+template <typename config>
 void connection<config>::append_header(std::string const & key,
     std::string const & val, lib::error_code & ec)
 {
@@ -1425,6 +1448,7 @@ void connection<config>::write_http_response(lib::error_code const & ec) {
     } else {
         m_ec = ec;
     }
+    
 
     m_response.set_version("HTTP/1.1");
 
@@ -1453,16 +1477,34 @@ void connection<config>::write_http_response(lib::error_code const & ec) {
         }
     }
 
-    // write raw bytes
-    transport_con_type::async_write(
-        m_handshake_buffer.data(),
-        m_handshake_buffer.size(),
-        lib::bind(
-            &type::handle_write_http_response,
-            type::get_shared(),
-            lib::placeholders::_1
-        )
-    );
+    // auto bodyFile = m_response.get_body_file();
+    // if (bodyFile) 
+    // {
+    //     // write raw bytes for the header, and then write the contents of the file.
+    //     transport_con_type::async_write(
+    //         m_handshake_buffer.data(),
+    //         m_handshake_buffer.size(),
+    //         bodyFile,
+    //         lib::bind(
+    //             &type::handle_write_http_response,
+    //             type::get_shared(),
+    //             lib::placeholders::_1
+    //         )
+    //     );
+
+    // } else 
+    {
+        // write raw bytes
+        transport_con_type::async_write(
+            m_handshake_buffer.data(),
+            m_handshake_buffer.size(),
+            lib::bind(
+                &type::handle_write_http_response,
+                type::get_shared(),
+                lib::placeholders::_1
+            )
+        );
+    }
 }
 
 template <typename config>
@@ -1520,6 +1562,15 @@ void connection<config>::handle_write_http_response(lib::error_code const & ec) 
               << m_response.get_status_code();
             m_elog->write(log::elevel::rerror,s.str());
         } else {
+            // if we have a file body, then we have written the header.
+            // now transmit the file contents;
+            // the expected response and the connection can be closed.
+            auto bodyFile = m_response.take_body_file();
+            if (bodyFile)
+            {
+                write_http_response_body_file(bodyFile);
+                return;
+            }
             // if this was not a websocket connection, we have written
             // the expected response and the connection can be closed.
             
@@ -1546,6 +1597,49 @@ void connection<config>::handle_write_http_response(lib::error_code const & ec) 
     }
 
     this->handle_read_frame(lib::error_code(), m_buf_cursor);
+}
+
+template <typename config>
+void connection<config>::handle_write_http_body_response(std::shared_ptr<download_file> downloadFile, lib::error_code const & ec)
+{
+    if (ec) {
+        this->handle_write_http_response(ec);
+        return;
+    }
+    m_handshake_buffer.resize(64*1024);
+    size_t nRead = downloadFile->read(m_handshake_buffer.data(),m_handshake_buffer.size());
+    if (nRead == 0)
+    {
+        this->handle_write_http_response(lib::error_code());
+    }
+    m_handshake_buffer.resize(nRead);
+
+    transport_con_type::async_write(
+        m_handshake_buffer.data(),
+        m_handshake_buffer.size(),
+        lib::bind(
+            &type::handle_write_http_body_response,
+            type::get_shared(),
+            downloadFile,
+            lib::placeholders::_1
+        )
+    );
+
+}
+
+template <typename config>
+void connection<config>::write_http_response_body_file(std::shared_ptr<download_file> downloadFile)
+{
+    lib::error_code ec;
+    ec = downloadFile->open();
+    if (ec) {
+
+        log_err(log::elevel::rerror,"Can't open download temporary file.",ec);
+
+        this->handle_write_http_response(ec);
+        return;
+    }
+    handle_write_http_body_response(downloadFile,lib::error_code());
 }
 
 template <typename config>

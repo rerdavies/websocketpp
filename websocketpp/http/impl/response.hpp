@@ -256,6 +256,26 @@ inline std::string response::raw() const {
     return ret.str();
 }
 
+
+inline void response::set_body_file(const std::filesystem::path&filePath, bool deleteWhenDone)
+{
+    body_file =  std::make_shared<download_file>(filePath,deleteWhenDone);
+}
+
+inline std::shared_ptr<download_file> response::get_body_file() {
+    return body_file;
+}
+inline std::shared_ptr<download_file> response::take_body_file() {
+    if (body_file)
+    {
+        std::shared_ptr<download_file> result = std::move(body_file);
+        return result;
+    }
+    return nullptr;
+}
+
+
+
 inline lib::error_code response::set_status(status_code::value code) {
     // In theory the type of status_code::value should prevent setting any
     // invalid values. Messages are canned and looked up and known to be

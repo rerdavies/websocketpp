@@ -48,6 +48,7 @@
 
 namespace websocketpp {
 
+
 /// The type and function signature of an open handler
 /**
  * The open handler is called once for every successful WebSocket connection
@@ -257,6 +258,7 @@ public:
     /// Type of a shared pointer to the transport component of this connection
     typedef typename transport_con_type::ptr transport_con_ptr;
 
+    typedef websocketpp::http::parser::download_file download_file;
     typedef lib::function<void(ptr)> termination_handler;
 
     typedef typename concurrency_type::scoped_lock_type scoped_lock_type;
@@ -1089,6 +1091,7 @@ public:
      */
     void set_body(std::string const & value, lib::error_code & ec);
 
+
 #ifndef _WEBSOCKETPP_NO_EXCEPTIONS_
     /// Set response body content (exception)
     /**
@@ -1118,6 +1121,56 @@ public:
     void set_body(std::string && value);
 #endif // _WEBSOCKETPP_NO_EXCEPTIONS_
 #endif // _WEBSOCKETPP_MOVE_SEMANTICS_
+
+#ifndef _WEBSOCKETPP_NO_EXCEPTIONS_
+    /// Set response body to the contents of a file (exception)
+    /**
+     * Set the body HTTP response to the specified  file. Note  that set_body_file
+     * will also set the Content-Length HTTP header to the appropriate
+     * value. If you want the Content-Length header to be something else set it
+     * to something else after calling set_body().
+     * 
+     * The results of calling set_body() and set_body_file() on the same 
+     * response is undefinied.
+     *
+     * This member function is valid only from the http() and validate() handler
+     * callbacks.
+     *
+     * @param[in] file the path of the file to use as the body of the response.
+     * @param[in] deleteWhendone if true the file is deleted after the download completes.
+     * @throw  websocketpp::exception
+     * @see websocketpp::http::response::set_body
+     * @see set_body_file(const std::filesystem::path&path,bool deleteWhenDone, lib::error_code &)
+     *      (exception free version)
+     */
+    void set_body_file(const std::filesystem::path&path, bool deleteWhenDone);
+#endif
+
+
+    /// Set response body to the contents of a file
+    /**
+     * Set the body HTTP response to the specified  file. Not  that set_body_file
+     * will also set the Content-Length HTTP header to the appropriate
+     * value. If you want the Content-Length header to be something else set it
+     * to something else after calling set_body().
+     * 
+     * The results of calling set_body() and set_body_file() on the same 
+     * response is undefinied.
+     *
+     * This member function is valid only from the http() and validate() handler
+     * callbacks.
+     *
+     * @param[in] file the path of the file to use as the body of the response.
+     * @param[in] deleteWhendone if true the file is deleted after the download completes.
+     * @param[out] errorCode An error if the file does not exist.
+     * @see websocketpp::http::response::set_body
+     * @see set_body(std::string const &, lib::error_code &)
+     *      (exception free version)
+     */
+
+    void set_body_file(const std::filesystem::path&path, bool deleteWhenDone, lib::error_code&ec);
+
+
 
     /// Append a header (exception free)
     /**
@@ -1448,6 +1501,9 @@ public:
 
     
     void handle_write_http_response(lib::error_code const & ec);
+
+    void handle_write_http_body_response(std::shared_ptr<download_file> downloadFile,lib::error_code const & ec);
+
     void handle_send_http_request(lib::error_code const & ec);
 
     void handle_open_handshake_timeout(lib::error_code const & ec);
@@ -1523,6 +1579,8 @@ private:
 
     /// Completes m_response, serializes it, and sends it out on the wire.
     void write_http_response(lib::error_code const & ec);
+
+    void write_http_response_body_file(std::shared_ptr<download_file> downloadFile);
 
     /// Sends an opening WebSocket connect request
     void send_http_request();
